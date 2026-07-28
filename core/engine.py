@@ -1,12 +1,12 @@
-from core.history_datatype import CompanyHistory
+from core.models import CompanySearchHistory
 from collections import OrderedDict
 from datetime import datetime, timedelta
 import os, threading, time, pickle, glob
 
 DB_DIR = "/data/"
-DEFAULT_FILE_PATH = os.path.join(DB_DIR, "redis_lite_dump.rdb")
+DEFAULT_FILE_PATH = os.path.join(DB_DIR, "search_history_dump.db")
 
-class RedisDB:
+class HistoryStore:
     def __init__(self):
         self.storage = OrderedDict()
         os.makedirs(DB_DIR, exist_ok=True)
@@ -32,8 +32,8 @@ class RedisDB:
     def set_history(self, cid: str, vid: str, query: str):
             with self.lock:
                 if cid not in self.storage:
-                    self.storage[cid] = CompanyHistory()
-                elif not isinstance(self.storage[cid], CompanyHistory):
+                    self.storage[cid] = CompanySearchHistory()
+                elif not isinstance(self.storage[cid], CompanySearchHistory):
                     raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
 
                 result = self.storage[cid].add_query(vid, query)
@@ -45,7 +45,7 @@ class RedisDB:
                 if cid not in self.storage:
                     return []
 
-                if isinstance(self.storage[cid], CompanyHistory):
+                if isinstance(self.storage[cid], CompanySearchHistory):
                     return self.storage[cid].get_queries_by_vid(vid)
                 else:
                     raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
@@ -84,7 +84,7 @@ class RedisDB:
         def save_task(snapshot_bytedata, old_aof):
             try:
                 os.makedirs(DB_DIR, exist_ok=True)
-                actual_filename = filename if filename else "redis_lite_dump.rdb"
+                actual_filename = filename if filename else "search_history_dump.db"
                 target_path = os.path.join(DB_DIR, actual_filename)
                 temp_path = f"{target_path}.tmp"
                 
@@ -95,9 +95,9 @@ class RedisDB:
                 print(f"[BGSAVE] Veriler diske yazıldı: {target_path}")
                 
                 # Eğer özel bir isim verildiyse, asıl dump dosyasını da güncelleyelim ki sistem oradan okusun
-                if actual_filename != "redis_lite_dump.rdb":
+                if actual_filename != "search_history_dump.db":
                     import shutil
-                    dump_path = os.path.join(DB_DIR, "redis_lite_dump.rdb")
+                    dump_path = os.path.join(DB_DIR, "search_history_dump.db")
                     shutil.copy2(target_path, dump_path)
                 
                 if os.path.exists(old_aof):
@@ -123,7 +123,7 @@ class RedisDB:
                 
             try:
                 os.makedirs(DB_DIR, exist_ok=True)
-                actual_filename = filename if filename else "redis_lite_dump.rdb"
+                actual_filename = filename if filename else "search_history_dump.db"
                 target_path = os.path.join(DB_DIR, actual_filename)
                 temp_path = f"{target_path}.tmp"
                 
@@ -141,7 +141,7 @@ class RedisDB:
             if os.path.exists(DEFAULT_FILE_PATH):
                 load_path = DEFAULT_FILE_PATH
             else:
-                search_pattern = os.path.join(DB_DIR, "redis_lite_*.rdb")
+                search_pattern = os.path.join(DB_DIR, "search_history_*.db")
                 all_backups = glob.glob(search_pattern)
                 if all_backups:
                     load_path = max(all_backups, key=os.path.getmtime)
@@ -197,13 +197,13 @@ class RedisDB:
                 # 7 gün öncesinin tarih sınırını hesapla
                 time_threshold = datetime.now() - timedelta(days=7)
                 
-                # Klasör içindeki "redis_lite_*.rdb" şablonuna uyan tüm dosyaları bulur
-                search_pattern = os.path.join(DB_DIR, "redis_lite_*.rdb")
+                # Klasör içindeki "search_history_*.db" şablonuna uyan tüm dosyaları bulur
+                search_pattern = os.path.join(DB_DIR, "search_history_*.db")
                 all_backup_files = glob.glob(search_pattern)
                 
                 for file_path in all_backup_files:
-                    # Varsayılan dump dosyasını (redis_lite_dump.rdb) asla silmiyoruz, o sistemin kalbi
-                    if "redis_lite_dump.rdb" in file_path:
+                    # Varsayılan dump dosyasını asla silmiyoruz, o sistemin kalbi
+                    if "search_history_dump.db" in file_path:
                         continue
                         
                     # Dosyanın son değiştirilme/oluşturulma zamanını alıyoruz

@@ -1,6 +1,6 @@
 from collections import OrderedDict
 
-class CompanyHistory:
+class CompanySearchHistory:
     def __init__(self, max_visitors=50000):
         # LRU mantığı kurabilmek için OrderedDict kullanıyoruz
         self.visitors = OrderedDict()
@@ -8,7 +8,7 @@ class CompanyHistory:
 
     def add_query(self, vid, query):
         if vid not in self.visitors:
-            self.visitors[vid] = QueryHistoryMRU()
+            self.visitors[vid] = VisitorSearchCache()
         else:
             # Mevcut ziyaretçi işlem yaparsa, aktifliğini (LRU) güncelle
             self.visitors.move_to_end(vid, last=True)
@@ -31,7 +31,7 @@ class CompanyHistory:
 
 
         
-class QueryHistoryMRU:
+class VisitorSearchCache:
     def __init__(self):
         self.value = OrderedDict()
     

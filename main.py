@@ -1,5 +1,5 @@
 from typing import Optional
-from core.history_database import RedisDB
+from core.engine import HistoryStore
 from fastapi import FastAPI, HTTPException
 import asyncio
 from contextlib import asynccontextmanager
@@ -13,7 +13,7 @@ def nightly_backup_job():
     
     # 1. Adım: O anki tarihi alıp dosya adı üretiyoruz
     today_str = datetime.now().strftime("%Y-%m-%d")
-    cron_filename = f"redis_lite_{today_str}.rdb"
+    cron_filename = f"search_history_{today_str}.db"
     
     # 2. Adım: BGSAVE ile arka planda yedekle ve AOF'yi döndür
     db.bgsave(filename=cron_filename)
@@ -44,11 +44,11 @@ async def lifespan(app: FastAPI):
     finally:
         # [KAPANIŞ] Sunucu kapatılırken veriler kaybolmasın diye son bir yedek alıyoruz
         print("[SİSTEM] Sunucu kapatılıyor, kapanış yedeği alınıyor...")
-        db.save_to_disk(filename="redis_lite_dump.rdb")
+        db.save_to_disk(filename="search_history_dump.db")
         scheduler.shutdown()
 
 app = FastAPI(root_path="/redis", lifespan=lifespan)
-db = RedisDB()
+db = HistoryStore()
 
 ### Search History'e ait Endpointler
 
