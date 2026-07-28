@@ -9,6 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 EXPOSE 8000
-EXPOSE 6379
+
+# Veritabanı (RDB ve AOF) dosyalarının kalıcı olması için Volume tanımlıyoruz
+VOLUME ["/data"]
 
 CMD ["uvicorn","main:app", "--host", "0.0.0.0", "--port", "8000", "--loop", "uvloop"]
