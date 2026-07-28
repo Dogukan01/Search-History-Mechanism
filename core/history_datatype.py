@@ -28,8 +28,7 @@ class CompanyHistory:
             return self.visitors[vid].get_query()
         return []
 
-    def get_all(self):
-        return {vid: history.get_query() for vid, history in self.visitors.items()}
+
 
         
 class QueryHistoryMRU:

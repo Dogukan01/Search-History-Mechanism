@@ -40,16 +40,13 @@ class RedisDB:
                 self._log_to_aof("SET_HISTORY", cid, vid, query)
                 return result
 
-    def get_history(self, cid: str, vid: str = None):
+    def get_history(self, cid: str, vid: str):
             with self.lock:
                 if cid not in self.storage:
-                    return {} if vid is None else []
+                    return []
 
                 if isinstance(self.storage[cid], CompanyHistory):
-                    if vid:
-                        return self.storage[cid].get_queries_by_vid(vid)
-                    else:
-                        return self.storage[cid].get_all()
+                    return self.storage[cid].get_queries_by_vid(vid)
                 else:
                     raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
 

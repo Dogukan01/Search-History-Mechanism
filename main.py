@@ -61,7 +61,7 @@ def set_history_value(vid: str, query: str, cid: Optional[str] = "default"):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/get_history")
-def get_history_value(cid: Optional[str] = "default", vid: Optional[str] = None):
+def get_history_value(vid: str, cid: Optional[str] = "default"):
     try:
         result = db.get_history(cid, vid)
         return result
