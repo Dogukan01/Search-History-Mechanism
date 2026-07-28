@@ -1,28 +1,11 @@
 from typing import Optional
 from core.history_database import RedisDB
-from core.tcp_server import start_tcp_server
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-
-class SetRequest(BaseModel):
-    key: str
-    value: str
-    ex: int | None = None
-
-class HSetRequest(BaseModel):
-    key: str
-    field: str
-    value: str
-
-class ZAddRequest(BaseModel):
-    key: str
-    score: float
-    member: str
 
 def nightly_backup_job():
     """Her gece saat 03:00'te tetiklenecek ana cron fonksiyonu"""
@@ -43,10 +26,6 @@ async def lifespan(app: FastAPI):
     # [AÇILIŞ] Konteyner başlarken diskteki veriyi RAM'e geri yükle
     db.load_from_disk()
     
-    # TCP Sunucusunu arka planda başlatıyoruz
-    loop = asyncio.get_event_loop()
-    tcp_task = loop.create_task(start_tcp_server(db))
-    
     # Zamanlayıcıyı (Scheduler) kuruyoruz
     scheduler = BackgroundScheduler()
     
@@ -58,19 +37,15 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     print("[SİSTEM] Gece 03:00 CronJob zamanlayıcısı başarıyla başlatıldı.")
     
-    yield
-    
-    # TCP sunucusunu kapatıyoruz
-    tcp_task.cancel()
     try:
-        await tcp_task
+        yield
     except asyncio.CancelledError:
         pass
-
-    # [KAPANIŞ] Sunucu kapatılırken veriler kaybolmasın diye son bir yedek alıyoruz
-    print("[SİSTEM] Sunucu kapatılıyor, kapanış yedeği alınıyor...")
-    db.save_to_disk(filename="redis_lite_dump.rdb")
-    scheduler.shutdown()
+    finally:
+        # [KAPANIŞ] Sunucu kapatılırken veriler kaybolmasın diye son bir yedek alıyoruz
+        print("[SİSTEM] Sunucu kapatılıyor, kapanış yedeği alınıyor...")
+        db.save_to_disk(filename="redis_lite_dump.rdb")
+        scheduler.shutdown()
 
 app = FastAPI(root_path="/redis", lifespan=lifespan)
 db = RedisDB()
@@ -92,25 +67,3 @@ def get_history_value(cid: Optional[str] = "default", vid: Optional[str] = None)
         return result
     except TypeError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-### Manuel Yedek Alma Endpointi
-
-@app.post("/admin/backup")
-async def trigger_manual_backup():
-    """
-    Swagger UI üzerinden veya kod içinden manuel tetikleyebileceğin yedekleme endpoint'i.
-    API'yi kilitlememesi için işlemi arka plan görevi olarak çalıştırır (BGSAVE).
-    """
-    # Manuel yedek ismini saat ve dakika içererek üretiyoruz
-    now_str = datetime.now().strftime("%Y-%m-%d_%H-%M")
-    manual_filename = f"redis_lite_manual_{now_str}.rdb"
-    
-    # BGSAVE kendi thread'ini başlattığı için BackgroundTasks kullanmaya gerek yok
-    db.bgsave(filename=manual_filename)
-    
-    return {
-        "durum": "Yedekleme işlemi arka planda (BGSAVE) başlatıldı",
-        "olusturulan_dosya": manual_filename,
-        "mesaj": "Verileriniz RDB'ye aktarılıyor ve AOF dosyası yenileniyor."
-    }

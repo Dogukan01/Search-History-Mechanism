@@ -9,7 +9,6 @@ DEFAULT_FILE_PATH = os.path.join(DB_DIR, "redis_lite_dump.rdb")
 class RedisDB:
     def __init__(self):
         self.storage = OrderedDict()
-        self.expires = {}
         os.makedirs(DB_DIR, exist_ok=True)
         self.aof_path = os.path.join(DB_DIR, "appendonly.aof")
         self.aof_file = open(self.aof_path, "a")
@@ -32,7 +31,6 @@ class RedisDB:
 
     def set_history(self, cid: str, vid: str, query: str):
             with self.lock:
-                self.expires.pop(cid, None)
                 if cid not in self.storage:
                     self.storage[cid] = CompanyHistory()
                 elif not isinstance(self.storage[cid], CompanyHistory):
@@ -72,8 +70,7 @@ class RedisDB:
         with self.lock:
         # 1. Snapshot for thread
             snapshot_bytedata = pickle.dumps({
-                "storage": self.storage,
-                "expires": self.expires
+                "storage": self.storage
             })
         
         # 2. AOF Rotation
@@ -117,6 +114,30 @@ class RedisDB:
         t.start()
         return "BGSAVE started in background"
 
+    def save_to_disk(self, filename=None):
+        """Uygulama kapanırken senkron (bekleyerek) yedek alır. Arka plan thread'i kullanmaz."""
+        print("[SAVE] Kapanış yedeği senkron olarak alınıyor...")
+        with self.lock:
+            snapshot_bytedata = pickle.dumps({
+                "storage": self.storage
+            })
+            if hasattr(self, 'aof_file') and not self.aof_file.closed:
+                self.aof_file.close()
+                
+            try:
+                os.makedirs(DB_DIR, exist_ok=True)
+                actual_filename = filename if filename else "redis_lite_dump.rdb"
+                target_path = os.path.join(DB_DIR, actual_filename)
+                temp_path = f"{target_path}.tmp"
+                
+                with open(temp_path, "wb") as f:
+                    f.write(snapshot_bytedata)
+                
+                os.replace(temp_path, target_path)
+                print(f"[SAVE] Veriler diske yazıldı: {target_path}")
+            except Exception as e:
+                print(f"[SAVE HATA] İşlem başarısız: {e}")
+
     def load_from_disk(self):
         """Uygulama açılırken en güncel yedeği bulur ve belleğe yükler."""
         with self.lock:
@@ -135,12 +156,10 @@ class RedisDB:
                 try:
                     with open(load_path, "rb") as f:
                         loaded_data = pickle.load(f)
-                        if isinstance(loaded_data, dict) and "storage" in loaded_data and "expires" in loaded_data:
+                        if isinstance(loaded_data, dict) and "storage" in loaded_data:
                             self.storage = loaded_data["storage"]
-                            self.expires = loaded_data["expires"]
                         else:
                             self.storage = loaded_data
-                            self.expires = {}
                     print(f"[BAŞLANGIÇ] RDB başarıyla yüklendi: {load_path}")
                 except Exception as e:
                     print(f"[HATA] RDB okunurken hata oluştu: {e}")
@@ -163,25 +182,7 @@ class RedisDB:
                             continue
                             
                         cmd = parts[0].upper()
-                        if cmd == "SET" and len(parts) >= 3:
-                            self.set(parts[1], parts[2])
-                        elif cmd == "EXPIRE" and len(parts) >=3:
-                            self.expire(parts[1], parts[2])
-                        elif cmd == "INCR" and len(parts) >= 2:
-                            self.incr(parts[1])
-                        elif cmd == "HSET":
-                            inner_parts = line.strip().split(" ", 3)
-                            if len(inner_parts) >= 4:
-                                self.hset(inner_parts[1], inner_parts[2], inner_parts[3])
-                        elif cmd == "HDEL" and len(parts) >= 3:
-                            self.hdel(parts[1], parts[2])
-                        elif cmd == "ZADD":
-                            inner_parts = line.strip().split(" ", 3)
-                            if len(inner_parts) >= 4:
-                                self.zadd(inner_parts[1], inner_parts[2], inner_parts[3])
-                        elif cmd == "ZREM" and len(parts) >= 3:
-                            self.zrem(parts[1], parts[2])
-                        elif cmd == "SET_HISTORY":
+                        if cmd == "SET_HISTORY":
                             inner_parts = line.strip().split(" ", 3)
                             if len(inner_parts) >= 4:
                                 self.set_history(inner_parts[1], inner_parts[2], inner_parts[3])

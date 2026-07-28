@@ -1,12 +1,12 @@
 from collections import OrderedDict
 
-class RedisCompanyHistory:
+class CompanyHistory:
     def __init__(self):
         self.visitors = {}
 
     def add_query(self, vid, query):
         if vid not in self.visitors:
-            self.visitors[vid] = RedisMRU()
+            self.visitors[vid] = QueryHistoryMRU()
 
         return self.visitors[vid].add_query(query)
 
@@ -19,7 +19,7 @@ class RedisCompanyHistory:
         return {vid: history.get_query() for vid, history in self.visitors.items()}
 
         
-class RedisMRU:
+class QueryHistoryMRU:
     def __init__(self):
         self.value = OrderedDict()
     
