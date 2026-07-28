@@ -1,0 +1,23 @@
+services:
+  search-history-app:
+    image: search-history-api
+    build: .
+    container_name: search-history-app
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - TZ=Europe/Istanbul
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - /home/dogukan/search_history_data:/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: "512M"
