@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
         db.save_to_disk(filename="search_history_dump.db")
         scheduler.shutdown()
 
-app = FastAPI(root_path="/redis", lifespan=lifespan)
+app = FastAPI(lifespan=lifespan)
 db = HistoryStore()
 
 ### Search History'e ait Endpointler
