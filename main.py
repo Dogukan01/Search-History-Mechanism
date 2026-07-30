@@ -1,3 +1,4 @@
+from fastapi.openapi.utils import status_code_ranges
 from typing import Optional
 from core.engine import HistoryStore
 from fastapi import FastAPI, HTTPException
@@ -67,3 +68,16 @@ def get_history_value(vid: str, cid: Optional[str] = "default"):
         return result
     except TypeError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("delete_history")
+def delete_history_value(vid: str, query: Optional[str] = None, cid: Optional[str] = "default"):
+    try:
+        db.delete_history(cid, vid, query)
+
+        if query:
+            return {"status": "OK", "message": f"Query '{query}' deleted for vid: {vid}"}
+        else:
+            return {"status": "OK", "message": f"All search history deleted for vid: {vid}"}
+
+    except TypeError as e:
+        raise HTTPException(status_code=400, detail= str(e))
