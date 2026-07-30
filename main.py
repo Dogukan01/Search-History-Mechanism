@@ -81,3 +81,7 @@ def delete_history_value(vid: str, query: Optional[str] = None, cid: Optional[st
 
     except TypeError as e:
         raise HTTPException(status_code=400, detail= str(e))
+
+@app.get("/stats")
+def get_system_stats():
+    return db.get_stats()

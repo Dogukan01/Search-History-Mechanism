@@ -61,6 +61,26 @@ class HistoryStore:
                 else:
                     self._log_to_aof("DEL_HISTORY", cid, vid)
 
+    def get_stats(self):
+        with self.lock:
+            total_companies = len(self.storage)
+            total_visitors = sum(len(company.visitors) for company in self.storage.values())
+            
+            try:
+                # `pickle` ile serialize ederek bellekteki veri yapısının büyüklüğünü (byte cinsinden) tahmin ediyoruz.
+                storage_size_bytes = len(pickle.dumps(self.storage))
+            except Exception:
+                storage_size_bytes = 0
+                
+            storage_size_mb = storage_size_bytes / (1024 * 1024)
+            
+            return {
+                "total_companies": total_companies,
+                "total_active_visitors": total_visitors,
+                "estimated_memory_usage_mb": round(storage_size_mb, 2),
+                "note": "Memory usage is estimated via serialization. True RAM usage may be slightly higher due to Python object overhead."
+            }
+
     def _log_to_aof(self, command, *args):
         with self.lock:
             if self.is_replaying:
