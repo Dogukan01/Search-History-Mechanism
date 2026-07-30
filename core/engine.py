@@ -50,6 +50,17 @@ class HistoryStore:
                 else:
                     raise TypeError("HATA (WRONGTYPE): Anahtar üzerinde geçersiz veri türü işlemi yapılmaya çalışıldı.")
 
+    def delete_history(self, cid: str, vid: str, query=None):
+        with self.lock:
+            if cid not in self.storage:
+                return
+            else:
+                self.storage[cid].delete_history(vid, query)
+                if query is not None:
+                    self._log_to_aof("DEL_HISTORY", cid, vid, query)
+                else:
+                    self._log_to_aof("DEL_HISTORY", cid, vid)
+
     def _log_to_aof(self, command, *args):
         with self.lock:
             if self.is_replaying:
@@ -183,6 +194,12 @@ class HistoryStore:
                             inner_parts = line.strip().split(" ", 3)
                             if len(inner_parts) >= 4:
                                 self.set_history(inner_parts[1], inner_parts[2], inner_parts[3])
+                        elif cmd == "DEL_HISTORY":
+                            inner_parts = line.strip().split(" ", 3)
+                            if len(inner_parts) == 4:
+                                self.delete_history(inner_parts[1], inner_parts[2], inner_parts[3])
+                            elif len(inner_parts) == 3:
+                                self.delete_history(inner_parts[1], inner_parts[2])
             except Exception as e:
                 print(f"[AOF HATA] Replay hatası: {e}")
             finally:

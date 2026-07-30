@@ -28,6 +28,16 @@ class CompanySearchHistory:
             return self.visitors[vid].get_query()
         return []
 
+    def delete_history(self, vid, query=None):
+        if vid not in self.visitors:
+            return
+        if query is not None:
+            self.visitors[vid].delete_query(query)
+            if len(self.visitors[vid].value) <=0:
+                del self.visitors[vid]
+        else:
+            del self.visitors[vid]
+
 
 
         
@@ -44,3 +54,7 @@ class VisitorSearchCache:
 
     def get_query(self):
         return list(self.value.keys())
+
+    def delete_query(self, query):
+        if query in self.value:
+            self.value.pop(query)
